@@ -4,7 +4,7 @@ const {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
-const { initDb } = require('../config/database');
+const supabase = require('../config/supabase'); // Instância do Supabase criada no passo anterior
 const crypto = require('crypto');
 
 const RP_ID = process.env.RP_ID || 'localhost';
@@ -18,7 +18,6 @@ function sanitizeInput(text) {
 
 exports.generateRegisterOptions = async (req, res) => {
   try {
-    const db = await initDb();
     const name = sanitizeInput(req.body.name);
     const email = sanitizeInput(req.body.email);
 
@@ -26,17 +25,36 @@ exports.generateRegisterOptions = async (req, res) => {
       return res.status(400).json({ error: 'Nome e E-mail são obrigatórios.' });
     }
 
-    let user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    // Busca o usuário no Supabase
+    let { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle(); // Retorna 1 registro ou null, sem gerar erro se não encontrar
+
+    if (userError) throw userError;
+
     let userId;
 
     if (!user) {
       userId = crypto.randomUUID();
-      await db.run('INSERT INTO users (id, name, email) VALUES (?, ?, ?)', [userId, name, email]);
+      // Insere novo usuário
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{ id: userId, name: name, email: email }]);
+      
+      if (insertError) throw insertError;
     } else {
       userId = user.id;
     }
 
-    const userAuthenticators = await db.all('SELECT id FROM authenticators WHERE user_id = ?', [userId]);
+    // Busca autenticadores vinculados
+    const { data: userAuthenticators, error: authError } = await supabase
+      .from('authenticators')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (authError) throw authError;
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
@@ -49,9 +67,8 @@ exports.generateRegisterOptions = async (req, res) => {
         id: auth.id,
         type: 'public-key'
       })),
-    authenticatorSelection: {
-        // Remove a restrição rígida de apenas 'platform' para aceitar qualquer autenticador do SO/Navegador
-        userVerification: 'preferred', // Altera de 'required' para 'preferred' para evitar travamento no Windows Hello
+      authenticatorSelection: {
+        userVerification: 'preferred',
         residentKey: 'preferred',
       },
     });
@@ -67,7 +84,6 @@ exports.generateRegisterOptions = async (req, res) => {
 
 exports.verifyRegistration = async (req, res) => {
   try {
-    const db = await initDb();
     const { body } = req;
     const expectedChallenge = req.session.currentChallenge;
     const userId = req.session.registeringUserId;
@@ -89,18 +105,20 @@ exports.verifyRegistration = async (req, res) => {
     if (verified && registrationInfo) {
       const { credential, credentialDeviceType, credentialBackedUp } = registrationInfo;
 
-      await db.run(`
-        INSERT INTO authenticators (id, user_id, public_key, counter, transports, device_type, backed_up)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        credential.id,
-        userId,
-        Buffer.from(credential.publicKey),
-        credential.counter,
-        JSON.stringify(body.response.transports || []),
-        credentialDeviceType,
-        credentialBackedUp ? 1 : 0
-      ]);
+      // Insere o autenticador no Supabase
+      const { error: insertError } = await supabase
+        .from('authenticators')
+        .insert([{
+          id: credential.id,
+          user_id: userId,
+          public_key: Buffer.from(credential.publicKey).toString('base64'), // Converte Buffer para string Base64 para salvar no Supabase
+          counter: credential.counter,
+          transports: JSON.stringify(body.response.transports || []),
+          device_type: credentialDeviceType,
+          backed_up: credentialBackedUp ? 1 : 0
+        }]);
+
+      if (insertError) throw insertError;
 
       req.session.currentChallenge = null;
       req.session.registeringUserId = null;
@@ -118,29 +136,39 @@ exports.verifyRegistration = async (req, res) => {
 
 exports.generateLoginOptions = async (req, res) => {
   try {
-    const db = await initDb();
     const email = sanitizeInput(req.body.email);
     if (!email) {
       return res.status(400).json({ error: 'Informe o E-mail de acesso.' });
     }
 
-    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (userError) throw userError;
     if (!user) {
       return res.status(404).json({ error: 'Advogado/Usuário não cadastrado.' });
     }
 
-    const userAuthenticators = await db.all('SELECT id FROM authenticators WHERE user_id = ?', [user.id]);
-    if (userAuthenticators.length === 0) {
+    const { data: userAuthenticators, error: authError } = await supabase
+      .from('authenticators')
+      .select('id')
+      .eq('user_id', user.id);
+
+    if (authError) throw authError;
+    if (!userAuthenticators || userAuthenticators.length === 0) {
       return res.status(400).json({ error: 'Nenhum autenticador registrado.' });
     }
 
-   const options = await generateAuthenticationOptions({
+    const options = await generateAuthenticationOptions({
       rpID: RP_ID,
       allowCredentials: userAuthenticators.map(auth => ({
         id: auth.id,
         type: 'public-key',
       })),
-      userVerification: 'preferred', // Altera de 'required' para 'preferred'
+      userVerification: 'preferred',
     });
 
     req.session.currentChallenge = options.challenge;
@@ -154,7 +182,6 @@ exports.generateLoginOptions = async (req, res) => {
 
 exports.verifyLogin = async (req, res) => {
   try {
-    const db = await initDb();
     const { body } = req;
     const expectedChallenge = req.session.currentChallenge;
     const userId = req.session.loginUserId;
@@ -163,8 +190,14 @@ exports.verifyLogin = async (req, res) => {
       return res.status(400).json({ error: 'Desafio expirado.' });
     }
 
-    const dbAuthenticator = await db.get('SELECT * FROM authenticators WHERE id = ? AND user_id = ?', [body.id, userId]);
+    const { data: dbAuthenticator, error: authError } = await supabase
+      .from('authenticators')
+      .select('*')
+      .eq('id', body.id)
+      .eq('user_id', userId)
+      .maybeSingle();
 
+    if (authError) throw authError;
     if (!dbAuthenticator) {
       return res.status(400).json({ error: 'Autenticador não reconhecido.' });
     }
@@ -176,7 +209,7 @@ exports.verifyLogin = async (req, res) => {
       expectedRPID: RP_ID,
       authenticator: {
         credentialID: dbAuthenticator.id,
-        credentialPublicKey: dbAuthenticator.public_key,
+        credentialPublicKey: Buffer.from(dbAuthenticator.public_key, 'base64'), // Converte Base64 de volta para Buffer
         counter: dbAuthenticator.counter,
       },
       requireUserVerification: true,
@@ -185,7 +218,13 @@ exports.verifyLogin = async (req, res) => {
     const { verified, authenticationInfo } = verification;
 
     if (verified) {
-      await db.run('UPDATE authenticators SET counter = ? WHERE id = ?', [authenticationInfo.newCounter, dbAuthenticator.id]);
+      // Atualiza o contador no Supabase
+      const { error: updateError } = await supabase
+        .from('authenticators')
+        .update({ counter: authenticationInfo.newCounter })
+        .eq('id', dbAuthenticator.id);
+
+      if (updateError) throw updateError;
 
       req.session.regenerate((err) => {
         if (err) return res.status(500).json({ error: 'Erro ao consolidar sessão.' });
@@ -204,15 +243,25 @@ exports.verifyLogin = async (req, res) => {
 };
 
 exports.getDashboardData = async (req, res) => {
-  const db = await initDb();
-  const user = await db.get('SELECT id, name, email, created_at FROM users WHERE id = ?', [req.session.userId]);
-  return res.json({
-    user,
-    vaultItems: [
-      { id: 1, processNumber: '5001234-88.2026.8.13.0001', client: 'Empresa Alfa S.A.', secretData: 'Estratégia de Acordo: Teto Mágico R$ 2.500.000,00 - Confidencial', level: 'Máximo' },
-      { id: 2, processNumber: '1004321-12.2025.8.26.0100', client: 'Dra. Helena Viana', secretData: 'Chaves PGP de Evidências Digitais e Anexos Sigilosos', level: 'Máximo' }
-    ]
-  });
+  try {
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, email, created_at')
+      .eq('id', req.session.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    return res.json({
+      user,
+      vaultItems: [
+        { id: 1, processNumber: '5001234-88.2026.8.13.0001', client: 'Empresa Alfa S.A.', secretData: 'Estratégia de Acordo: Teto Mágico R$ 2.500.000,00 - Confidencial', level: 'Máximo' },
+        { id: 2, processNumber: '1004321-12.2025.8.26.0100', client: 'Dra. Helena Viana', secretData: 'Chaves PGP de Evidências Digitais e Anexos Sigilosos', level: 'Máximo' }
+      ]
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao carregar dashboard: ' + error.message });
+  }
 };
 
 exports.logout = (req, res) => {

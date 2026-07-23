@@ -4,7 +4,6 @@ const session = require('express-session');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 
-const { initDb } = require('./config/database'); // Importação do initDb
 const { globalLimiter, csrfCheck, helmetConfig } = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
 
@@ -50,14 +49,14 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Recurso não encontrado.' });
 });
 
-const PORT = process.env.PORT || 3000;
-
-// Inicializa o banco de dados primeiro, depois sobe o servidor HTTP
-initDb().then(() => {
-  console.log('[CHAVE MESTRA] Banco de Dados SQLite conectado.');
+// Inicialização condicional:
+// Se NÃO estiver em produção (ou seja, está no seu PC), roda o servidor localmente.
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`[CHAVE MESTRA] Servidor inicializado na porta ${PORT}`);
+    console.log(`[CHAVE MESTRA] Servidor inicializado na porta ${PORT} (Local)`);
   });
-}).catch((err) => {
-  console.error('Erro ao conectar ao Banco de Dados:', err);
-});
+}
+
+// Exportação obrigatória para o Vercel (Serverless Functions)
+module.exports = app;
