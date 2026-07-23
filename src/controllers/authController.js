@@ -4,7 +4,7 @@ const {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
-const supabase = require('../config/supabase'); // Instância do Supabase criada no passo anterior
+const supabase = require('../config/supabase'); // Instância do Supabase
 const crypto = require('crypto');
 
 const RP_ID = process.env.RP_ID || 'localhost';
@@ -30,7 +30,7 @@ exports.generateRegisterOptions = async (req, res) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .maybeSingle(); // Retorna 1 registro ou null, sem gerar erro se não encontrar
+      .maybeSingle();
 
     if (userError) throw userError;
 
@@ -111,7 +111,7 @@ exports.verifyRegistration = async (req, res) => {
         .insert([{
           id: credential.id,
           user_id: userId,
-          public_key: Buffer.from(credential.publicKey).toString('base64'), // Converte Buffer para string Base64 para salvar no Supabase
+          public_key: Buffer.from(credential.publicKey).toString('base64'),
           counter: credential.counter,
           transports: JSON.stringify(body.response.transports || []),
           device_type: credentialDeviceType,
@@ -120,6 +120,7 @@ exports.verifyRegistration = async (req, res) => {
 
       if (insertError) throw insertError;
 
+      // Atualiza a sessão para o usuário logado
       req.session.currentChallenge = null;
       req.session.registeringUserId = null;
       req.session.userId = userId;
@@ -209,7 +210,7 @@ exports.verifyLogin = async (req, res) => {
       expectedRPID: RP_ID,
       authenticator: {
         credentialID: dbAuthenticator.id,
-        credentialPublicKey: Buffer.from(dbAuthenticator.public_key, 'base64'), // Converte Base64 de volta para Buffer
+        credentialPublicKey: Buffer.from(dbAuthenticator.public_key, 'base64'),
         counter: dbAuthenticator.counter,
       },
       requireUserVerification: true,
@@ -226,14 +227,13 @@ exports.verifyLogin = async (req, res) => {
 
       if (updateError) throw updateError;
 
-      req.session.regenerate((err) => {
-        if (err) return res.status(500).json({ error: 'Erro ao consolidar sessão.' });
-
-        req.session.userId = userId;
-        req.session.lastActivity = Date.now();
-        return res.json({ verified: true });
-      });
-      return;
+      // Consolida a sessão com o cookie-session (Substitui o .regenerate)
+      req.session = {
+        userId: userId,
+        lastActivity: Date.now()
+      };
+      
+      return res.json({ verified: true });
     }
 
     return res.status(400).json({ verified: false, error: 'Assinatura inválida.' });
@@ -265,8 +265,7 @@ exports.getDashboardData = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie('sid_chave_mestra');
-    res.json({ status: 'logged_out' });
-  });
+  req.session = null; // Zera a sessão de forma compatível com o cookie-session
+  res.clearCookie('sid_chave_mestra');
+  res.json({ status: 'logged_out' });
 };

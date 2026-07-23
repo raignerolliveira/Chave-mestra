@@ -2,8 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-const cookieParser = require('cookie-parser');
-
+const cookieSession = require('cookie-session');
 const { globalLimiter, csrfCheck, helmetConfig } = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
 
@@ -21,18 +20,15 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use(cookieParser());
 
 // 4. Gerenciamento de Sessão
+// 4. Gerenciamento de Sessão (Otimizado para Vercel)
 app.use(
-  session({
+  cookieSession({
     name: 'sid_chave_mestra',
-    secret: process.env.SESSION_SECRET || 'chave_mestra_secret_ultra_seguro_32bytes',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 5 * 60 * 1000
-    }
+    keys: [process.env.SESSION_SECRET || 'chave_mestra_secret_ultra_seguro_32bytes'],
+    maxAge: 5 * 60 * 1000, // 5 minutos
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
   })
 );
 
