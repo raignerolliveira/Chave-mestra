@@ -1,28 +1,471 @@
-🗺️ Mapa da Arquitetura: Chave MestraEste documento detalha a estrutura de pastas e arquivos do projeto, explicando a responsabilidade de cada camada para facilitar a manutenção e o desenvolvimento da plataforma.
+# 🔐 Chave Mestra
 
-🌳 Visão Geral da Árvore de DiretóriosPlaintextCHAVE-MESTRA/
+> Plataforma de autenticação biométrica para advogados utilizando **WebAuthn (Passkeys)**, **Node.js**, **Express** e **Supabase**, desenvolvida com foco em segurança, escalabilidade e arquitetura organizada.
 
-├── 📁 node_modules/ # Bibliotecas de terceiros (gerado automaticamente)
-├── 📁 public/ # Camada de Apresentação (Frontend / Interface)
-├── 📁 src/ # Camada de Negócios e Servidor (Backend / API)
-├── 📄 .env # Variáveis de ambiente (Segredos)
-├── 📄 .gitignore # Regras de exclusão do Git
-├── 📄 package.json # Manifesto do projeto e dependências
-├── 📄 readme.md # Documentação principal
-└── 📄 vercel.json # Regras de infraestrutura para o deploy na nuvem
+---
 
-⚙️ 1. Raiz do Projeto (Configurações e Infraestrutura)Estes arquivos não contêm código de regras de negócio, mas sim as instruções de como a aplicação deve rodar, quais pacotes precisa e como será hospedada.ArquivoO que faz e para que serveComo utilizarpackage.jsonÉ o "RG" do projeto Node.js. Lista o nome, scripts de atalho e todas as bibliotecas que o projeto usa.Edite apenas quando precisar alterar comandos de inicialização. As bibliotecas são adicionadas aqui automaticamente ao rodar npm install.package-lock.jsonTrava as versões exatas das bibliotecas do package.json. Evita que o projeto quebre se uma biblioteca atualizar.Não edite manualmente. Ele é atualizado pelo próprio npm..envO cofre de segredos. Guarda chaves de banco de dados e senhas criptográficas.Crie este arquivo no seu PC para rodar localmente. Nunca envie para o GitHub..gitignoreInstrui o Git sobre quais arquivos ignorar (como o .env e a pasta pesada node_modules).Adicione o nome de pastas ou arquivos que devem ficar apenas no seu PC.vercel.jsonManual de instruções para a Vercel. Ensina o servidor a separar os arquivos estáticos (HTML) do código Node.js.Altere apenas se mudar a estrutura de pastas do projeto ou o sistema de rotas.
+# 📋 Visão Geral
 
-🌐 2. Camada Frontend (Pasta public/)Onde o usuário interage. Tudo nesta pasta roda diretamente no navegador do advogado.index.html: Página de entrada (Login). Coleta o e-mail do usuário para iniciar o desafio de biometria.register.html: Página de cadastro. Responsável por capturar dados do novo advogado e acionar o WebAuthn para registrar a impressão digital/FaceID.dashboard.html: O "Cofre Seguro". Interface carregada apenas após o sucesso da biometria, exibindo dados sigilosos e processos.css/custom.css: Arquivo de estilos que define cores, botões, margens e o design responsivo da plataforma.js/ (Scripts): Os "motores" das páginas. Os arquivos aqui dentro (ex: login.js, register.js) escutam os cliques dos botões, chamam a biometria nativa do dispositivo e enviam os dados para o Backend.
+O **Chave Mestra** é uma plataforma que utiliza autenticação biométrica nativa dos dispositivos (Face ID, Touch ID, Windows Hello, Android Biometrics e chaves de segurança FIDO2) para proteger o acesso de advogados às informações sensíveis da aplicação.
 
-🧠 3. Camada Backend (Pasta src/)Onde a mágica acontece. É o "cérebro" do sistema, rodando na nuvem (Serverless), totalmente isolado do usuário.O Ponto de Entradaapp.js: É o arquivo maestro. Ele inicia o servidor Express, aplica as travas de segurança (middlewares), inicializa a gestão de sessão (cookie-session) e aponta o caminho das rotas.As Subpastas (Padrão de Arquitetura)
+O projeto foi desenvolvido seguindo uma arquitetura organizada, separando claramente a interface do usuário (Frontend) das regras de negócio (Backend), facilitando manutenção, escalabilidade e evolução futura.
 
-📁 config/ (Conexões externas):supabase.js: Inicializa a conexão com o banco de dados na nuvem, usando a Service Key de forma segura.(Nota: O arquivo database.js continha o banco SQLite antigo. Recomenda-se excluí-lo para limpar o projeto).
+---
 
-📁 controllers/ (Regras de Negócio):authController.js: O coração da segurança. Recebe os pedidos do frontend, gera os desafios criptográficos da biometria, valida assinaturas, grava os usuários no banco de dados e gerencia o login/logout.
+# 🚀 Tecnologias
 
-📁 middlewares/ (Segurança da Porta de Entrada):Funções que interceptam as requisições antes de chegarem aos controladores.Exemplos de uso: Bloquear tentativas de DDoS (Rate Limit), garantir que as requisições são autênticas (CSRF) e limpar cabeçalhos suspeitos (Helmet).
+## Frontend
 
-📁 routes/ (Mapeamento de URLs):Define as URLs da sua API (ex: /api/login, /api/register).Como funciona: Quando o frontend pede /api/login, este arquivo direciona esse pedido para a função correta dentro de authController.js.
+* HTML5
+* CSS3
+* JavaScript (ES6)
+* WebAuthn API
+* Responsive Design
 
-📁 utils/ (Ferramentas de Apoio):Pasta reservada para pequenas funções repetitivas (como formatar datas, criar senhas aleatórias ou validar formatos de e-mail), mantendo os controladores principais limpos.
+## Backend
+
+* Node.js
+* Express.js
+* Supabase
+* cookie-session
+* Helmet
+* Rate Limit
+* CSRF Protection
+
+## Infraestrutura
+
+* Vercel
+* GitHub
+* Variáveis de Ambiente (.env)
+
+---
+
+# 📁 Arquitetura do Projeto
+
+```text
+CHAVE-MESTRA/
+│
+├── node_modules/
+│
+├── public/
+│   ├── css/
+│   ├── js/
+│   ├── dashboard.html
+│   ├── index.html
+│   └── register.html
+│
+├── src/
+│   ├── config/
+│   ├── controllers/
+│   ├── middlewares/
+│   ├── routes/
+│   ├── utils/
+│   └── app.js
+│
+├── .env
+├── .gitignore
+├── package.json
+├── package-lock.json
+├── readme.md
+└── vercel.json
+```
+
+---
+
+# ⚙️ Estrutura da Aplicação
+
+## 📂 Raiz do Projeto
+
+Arquivos responsáveis pela configuração geral da aplicação.
+
+### package.json
+
+É o manifesto do projeto.
+
+Responsável por:
+
+* listar dependências
+* scripts de execução
+* informações da aplicação
+
+---
+
+### package-lock.json
+
+Armazena exatamente quais versões das bibliotecas foram instaladas.
+
+Evita incompatibilidades entre ambientes.
+
+---
+
+### .env
+
+Arquivo de configuração contendo informações sigilosas.
+
+Exemplo:
+
+```env
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+SESSION_SECRET=
+```
+
+**Nunca envie este arquivo ao GitHub.**
+
+---
+
+### .gitignore
+
+Define quais arquivos não serão enviados ao repositório.
+
+Normalmente:
+
+```text
+node_modules
+.env
+```
+
+---
+
+### vercel.json
+
+Arquivo utilizado pela Vercel para definir como o projeto será publicado em ambiente de produção.
+
+---
+
+# 🌐 Frontend (public)
+
+Toda a interface utilizada pelo usuário.
+
+## index.html
+
+Tela inicial.
+
+Responsável por:
+
+* solicitar o e-mail
+* iniciar o processo de login biométrico
+
+---
+
+## register.html
+
+Tela de cadastro.
+
+Responsável por:
+
+* cadastro do advogado
+* registro da credencial WebAuthn
+* criação da Passkey
+
+---
+
+## dashboard.html
+
+Área protegida.
+
+Disponível apenas após autenticação biométrica.
+
+Exibe informações sigilosas do sistema.
+
+---
+
+## css/
+
+Contém os estilos da aplicação.
+
+Exemplo:
+
+```text
+custom.css
+```
+
+Responsável por:
+
+* layout
+* responsividade
+* identidade visual
+
+---
+
+## js/
+
+Scripts responsáveis pela comunicação com o backend.
+
+Exemplos:
+
+```text
+login.js
+register.js
+dashboard.js
+```
+
+Funções:
+
+* capturar eventos
+* iniciar WebAuthn
+* enviar dados para API
+* atualizar interface
+
+---
+
+# 🧠 Backend (src)
+
+Onde ficam todas as regras de negócio.
+
+---
+
+## app.js
+
+Arquivo principal da aplicação.
+
+Responsável por:
+
+* iniciar o Express
+* configurar middlewares
+* iniciar sessões
+* registrar rotas
+* iniciar API
+
+---
+
+# 📂 config
+
+Responsável pelas conexões externas.
+
+## supabase.js
+
+Inicializa a conexão com o banco de dados.
+
+Utiliza a Service Role Key armazenada no arquivo `.env`.
+
+---
+
+# 📂 controllers
+
+Onde ficam as regras de negócio.
+
+## authController.js
+
+Responsável por:
+
+* cadastro do usuário
+* geração do desafio WebAuthn
+* validação das assinaturas
+* autenticação biométrica
+* login
+* logout
+* gravação dos dados no banco
+
+É considerado o coração do sistema.
+
+---
+
+# 📂 middlewares
+
+Camada responsável por interceptar todas as requisições antes que cheguem aos controladores.
+
+Exemplos:
+
+* Helmet
+* Rate Limit
+* CSRF
+* autenticação
+* validações
+
+Objetivo:
+
+proteger a aplicação.
+
+---
+
+# 📂 routes
+
+Responsável pelo mapeamento das URLs.
+
+Exemplo:
+
+```text
+/api/register
+/api/login
+/api/logout
+/api/dashboard
+```
+
+As rotas apenas encaminham as requisições para os respectivos controladores.
+
+---
+
+# 📂 utils
+
+Contém funções auxiliares reutilizáveis.
+
+Exemplos:
+
+* validação de e-mail
+* geração de tokens
+* formatação de datas
+* funções criptográficas
+* utilidades gerais
+
+---
+
+# 🔐 Fluxo da Autenticação
+
+```text
+Usuário
+      │
+      ▼
+index.html
+      │
+      ▼
+login.js
+      │
+      ▼
+API (/login)
+      │
+      ▼
+authController
+      │
+      ▼
+Gera Challenge
+      │
+      ▼
+WebAuthn
+(Face ID / Digital / Windows Hello)
+      │
+      ▼
+Validação da Assinatura
+      │
+      ▼
+Supabase
+      │
+      ▼
+Sessão criada
+      │
+      ▼
+Dashboard
+```
+
+---
+
+# 🛡️ Camadas de Segurança
+
+O projeto utiliza diversas medidas para proteção da aplicação:
+
+* Autenticação WebAuthn (Passkeys)
+* Sessões seguras
+* Cookies HTTP Only
+* Helmet
+* Rate Limit
+* CSRF Protection
+* Variáveis protegidas no `.env`
+* Banco de dados Supabase
+* API isolada do Frontend
+
+---
+
+# ▶️ Como Executar
+
+## 1. Clone o projeto
+
+```bash
+git clone https://github.com/seu-usuario/chave-mestra.git
+```
+
+---
+
+## 2. Entre na pasta
+
+```bash
+cd chave-mestra
+```
+
+---
+
+## 3. Instale as dependências
+
+```bash
+npm install
+```
+
+---
+
+## 4. Configure o arquivo .env
+
+```env
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+SESSION_SECRET=
+```
+
+---
+
+## 5. Execute
+
+```bash
+npm start
+```
+
+ou
+
+```bash
+npm run dev
+```
+
+---
+
+# ☁️ Deploy
+
+A aplicação foi estruturada para publicação na **Vercel**, utilizando funções Serverless para o backend e hospedagem estática para o frontend.
+
+---
+
+# 📚 Estrutura Arquitetural
+
+A aplicação segue uma separação em camadas:
+
+```text
+Frontend
+    │
+    ▼
+Rotas
+    │
+    ▼
+Controllers
+    │
+    ▼
+Config
+    │
+    ▼
+Supabase
+```
+
+Essa organização facilita:
+
+* manutenção
+* testes
+* escalabilidade
+* reutilização de código
+* segurança
+
+---
+
+# 🎯 Objetivos do Projeto
+
+* autenticação sem senha
+* segurança elevada
+* biometria nativa
+* arquitetura limpa
+* fácil manutenção
+* escalabilidade
+* deploy simplificado
+* código organizado
+
+---
+
+# 👨‍💻 Autor
+
+**Projeto Chave Mestra**
+
+Plataforma desenvolvida com foco em autenticação biométrica moderna utilizando WebAuthn, Node.js, Express e Supabase.
