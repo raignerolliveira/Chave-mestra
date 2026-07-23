@@ -1,12 +1,15 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const path = require('path');
+const cookieParser = require('cookie-parser'); // <-- Adicionado para não dar erro lá embaixo
 const cookieSession = require('cookie-session');
 const { globalLimiter, csrfCheck, helmetConfig } = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
+
+// AVISA O EXPRESS QUE ESTAMOS RODANDO ATRÁS DE UM PROXY (VERCEL)
+app.set('trust proxy', 1);
 
 // 1. Defesas de Cabeçalhos HTTP com Helmet
 app.use(helmetConfig);
@@ -19,7 +22,6 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use(cookieParser());
 
-// 4. Gerenciamento de Sessão
 // 4. Gerenciamento de Sessão (Otimizado para Vercel)
 app.use(
   cookieSession({
