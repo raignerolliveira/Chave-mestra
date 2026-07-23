@@ -103,19 +103,25 @@ exports.verifyRegistration = async (req, res) => {
     const { verified, registrationInfo } = verification;
 
     if (verified && registrationInfo) {
-      const { credential, credentialDeviceType, credentialBackedUp } = registrationInfo;
+      // CORREÇÃO APLICADA AQUI: Compatibilidade com versões v9 e v10+ do pacote
+      const rawId = registrationInfo.credential ? registrationInfo.credential.id : registrationInfo.credentialID;
+      const publicKey = registrationInfo.credential ? registrationInfo.credential.publicKey : registrationInfo.credentialPublicKey;
+      const counter = registrationInfo.credential ? registrationInfo.credential.counter : registrationInfo.counter;
+      
+      // Converte o ID corretamente dependendo do formato retornado
+      const credentialId = typeof rawId === 'string' ? rawId : Buffer.from(rawId).toString('base64');
 
       // Insere o autenticador no Supabase
       const { error: insertError } = await supabase
         .from('authenticators')
         .insert([{
-          id: credential.id,
+          id: credentialId,
           user_id: userId,
-          public_key: Buffer.from(credential.publicKey).toString('base64'),
-          counter: credential.counter,
-          transports: JSON.stringify(body.response.transports || []),
-          device_type: credentialDeviceType,
-          backed_up: credentialBackedUp ? 1 : 0
+          public_key: Buffer.from(publicKey).toString('base64'),
+          counter: counter,
+          transports: JSON.stringify(body.response?.transports || []),
+          device_type: registrationInfo.credentialDeviceType || 'single_device',
+          backed_up: registrationInfo.credentialBackedUp ? 1 : 0
         }]);
 
       if (insertError) throw insertError;
